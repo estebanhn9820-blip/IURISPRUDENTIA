@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>IURISPRUDENTIA</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+
+:root{
+--fondo:#f7f4ee;
+--papel:#ffffff;
+--texto:#1f2937;
+--gris:#6b7280;
+--dorado:#8b6f33;
+--borde:#e5e7eb;
+}
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+body{
+background:var(--fondo);
+color:var(--texto);
+font-family:'Inter',sans-serif;
+line-height:1.6;
+}
+
+header{
+background:white;
+border-bottom:1px solid var(--borde);
+position:sticky;
+top:0;
+z-index:100;
+}
+
+.container{
+max-width:1200px;
+margin:auto;
+padding:0 24px;
+}
+
+.nav{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:20px 0;
+}
+
+.logo h1{
+font-family:'Cormorant Garamond',serif;
+font-size:42px;
+font-weight:700;
+letter-spacing:2px;
+}
+
+.logo p{
+font-size:12px;
+color:var(--gris);
+text-transform:uppercase;
+letter-spacing:1px;
+}
+
+.menu a{
+text-decoration:none;
+color:var(--texto);
+margin-left:25px;
+font-weight:500;
+}
+
+.hero{
+padding:90px 0;
+}
+
+.badge{
+display:inline-block;
+padding:6px 14px;
+border:1px solid var(--dorado);
+border-radius:50px;
+color:var(--dorado);
+font-size:12px;
+text-transform:uppercase;
+}
+
+.hero h2{
+font-family:'Cormorant Garamond',serif;
+font-size:80px;
+line-height:0.95;
+margin-top:20px;
+}
+
+.hero span{
+color:var(--dorado);
+}
+
+.hero p{
+margin-top:24px;
+max-width:750px;
+font-size:20px;
+color:var(--gris);
+}
+
+.buttons{
+margin-top:35px;
+}
+
+.btn{
+display:inline-block;
+padding:15px 25px;
+border-radius:8px;
+text-decoration:none;
+margin-right:10px;
+font-weight:600;
+}
+
+.btn-primary{
+background:var(--dorado);
+color:white;
+}
+
+.btn-outline{
+border:1px solid var(--dorado);
+color:var(--dorado);
+}
+
+.stats{
+display:grid;
+grid-template-columns:repeat(4,1fr);
+gap:20px;
+margin-top:70px;
+}
+
+.stat{
+background:white;
+border-radius:12px;
+padding:20px;
+text-align:center;
+box-shadow:0 1px 5px rgba(0,0,0,.05);
+}
+
+.stat h3{
+font-size:34px;
+color:var(--dorado);
+}
+
+.section{
+padding:80px 0;
+}
+
+.section h2{
+font-family:'Cormorant Garamond',serif;
+font-size:52px;
+margin-bottom:30px;
+}
+
+.search-box{
+display:flex;
+gap:10px;
+margin-bottom:25px;
+}
+
+.search-box input{
+flex:1;
+padding:18px;
+border:1px solid var(--borde);
+border-radius:8px;
+font-size:16px;
+}
+
+.search-box button{
+padding:18px 24px;
+border:none;
+background:var(--dorado);
+color:white;
+border-radius:8px;
+cursor:pointer;
+}
+
+.tags{
+margin-bottom:30px;
+}
+
+.tag{
+display:inline-block;
+margin:5px;
+padding:8px 14px;
+border:1px solid #d6d6d6;
+border-radius:30px;
+background:white;
+font-size:14px;
+}
+
+.cards{
+display:grid;
+gap:20px;
+}
+
+.card{
+background:white;
+border-radius:12px;
+padding:25px;
+box-shadow:0 1px 8px rgba(0,0,0,.06);
+}
+
+.card-theme{
+display:inline-block;
+padding:4px 10px;
+background:#f5ede0;
+border-radius:20px;
+color:var(--dorado);
+font-size:12px;
+font-weight:600;
+}
+
+.card h3{
+margin-top:12px;
+font-size:26px;
+}
+
+.card p{
+margin-top:12px;
+color:var(--gris);
+}
+
+.meta{
+margin-top:12px;
+font-size:14px;
+color:#888;
+}
+
+.linea{
+background:white;
+padding:30px;
+border-radius:12px;
+}
+
+.timeline{
+margin-top:20px;
+padding-left:20px;
+border-left:4px solid var(--dorado);
+}
+
+.timeline div{
+margin-bottom:20px;
+}
+
+footer{
+margin-top:60px;
+padding:40px;
+text-align:center;
+background:white;
+border-top:1px solid var(--borde);
+color:var(--gris);
+}
+
+@media(max-width:900px){
+
+.hero h2{
+font-size:50px;
+}
+
+.stats{
+grid-template-columns:1fr 1fr;
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+<div class="container nav">
+
+<div class="logo">
+<h1>IURISPRUDENTIA</h1>
+<p>Biblioteca Inteligente de Jurisprudencia Colombiana</p>
+</div>
+
+<div class="menu">
+<a href="#biblioteca">Biblioteca</a>
+<a href="#lineas">Líneas</a>
+<a href="#temas">Temas</a>
+<a href="#ia">Consultas IA</a>
+</div>
+
+</div>
+</header>
+
+<section class="hero">
+
+<div class="container">
+
+<span class="badge">
+Observatorio de Jurisprudencia Colombiana
+</span>
+
+<h2>
+La jurisprudencia
+<br>
+<span>a una pregunta de distancia</span>
+</h2>
+
+<p>
+Consulta, organiza y analiza providencias de la Corte Suprema de Justicia,
+Corte Constitucional, Consejo de Estado, tribunales superiores y tribunales administrativos.
+</p>
+
+<div class="buttons">
+
+<a class="btn btn-primary" href="#biblioteca">
+Explorar Biblioteca
+</a>
+
+<a class="btn btn-outline" href="#lineas">
+Líneas Jurisprudenciales
+</a>
+
+</div>
+
+<div class="stats">
+
+<div class="stat">
+<h3>1.250+</h3>
+<p>Providencias</p>
+</div>
+
+<div class="stat">
+<h3>70+</h3>
+<p>Temas</p>
+</div>
+
+<div class="stat">
+<h3>120+</h3>
+<p>Líneas</p>
+</div>
+
+<div class="stat">
+<h3>24/7</h3>
+<p>Consulta</p>
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section class="section" id="biblioteca">
+
+<div class="container">
+
+<h2>Biblioteca Jurisprudencial</h2>
+
+<div class="search-box">
+<input
+type="text"
+placeholder="Buscar por radicado, tema o palabra clave">
+<button>Buscar</button>
+</div>
+
+<div class="tags">
+
+<span class="tag">Extorsión</span>
+<span class="tag">Concierto para delinquir</span>
+<span class="tag">Competencia</span>
+<span class="tag">Conexidad</span>
+<span class="tag">Nulidades</span>
+<span class="tag">Imputación</span>
+<span class="tag">Acusación</span>
+<span class="tag">Prescripción</span>
+<span class="tag">Hechos jurídicamente relevantes</span>
+
+</div>
+
+<div class="cards">
+
+<div class="card">
+<span class="card-theme">
+Hechos Jurídicamente Relevantes
+</span>
+<h3>SP741-2021</h3>
+<p>
+La Corte desarrolla los estándares mínimos de claridad,
+precisión y suficiencia de los hechos jurídicamente relevantes.
+</p>
+<div class="meta">
+Corte Suprema de Justicia
+</div>
+</div>
+
+<div class="card">
+<span class="card-theme">
+Nulidades
+</span>
+<h3>AP6150-2026</h3>
+<p>
+Importancia estructural de los hechos jurídicamente relevantes
+en el proceso penal.
+</p>
+<div class="meta">
+Sala de Casación Penal
+</div>
+</div>
+
+<div class="card">
+<span class="card-theme">
+Imputación y Acusación
+</span>
+<h3>SP2042-2022</h3>
+<p>
+Límites entre imputación y acusación y alcance de la congruencia fáctica.
+</p>
+<div class="meta">
+Sala de Casación Penal
+</div>
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section class="section" id="lineas">
+
+<div class="container">
+
+<h2>Líneas Jurisprudenciales</h2>
+
+<div class="linea">
+
+<h3>
+Hechos Jurídicamente Relevantes
+</h3>
+
+<div class="timeline">
+
+<div>
+<strong>2018</strong>
+<br>
+SP14792-2018
+</div>
+
+<div>
+<strong>2021</strong>
+<br>
+SP741-2021
+</div>
+
+<div>
+<strong>2022</strong>
+<br>
+SP2042-2022
+</div>
+
+<div>
+<strong>2026</strong>
+<br>
+AP6150-2026
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<footer>
+
+IURISPRUDENTIA
+
+<br>
+
+Biblioteca Inteligente de Jurisprudencia Colombiana
+
+</footer>
+
+</body>
+</html>
