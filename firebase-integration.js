@@ -8,7 +8,7 @@ const firebaseConfig = {
   projectId: 'iurisprudentia-40ac5',
   storageBucket: 'iurisprudentia-40ac5.firebasestorage.app',
   messagingSenderId: '358518113591',
-  appId: '1:358518113591:web:7fb1497a724fe5e55dd862'
+  appId: '1:358518113591:web:9b1497a724fe5e55dd862'
 };
 
 const app = initializeApp(firebaseConfig);
