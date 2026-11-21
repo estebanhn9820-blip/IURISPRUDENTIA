@@ -20,6 +20,31 @@ const DB_NAME = 'iurisprudentia';
 const STORE = 'sentences';
 const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate', 'magistrate', 'topic', 'subtopics', 'keywords', 'legalIssue', 'thesis', 'rules', 'reasoning', 'decision', 'otherDecision'];
 
+function ensureAuthControls() {
+  const nav = document.querySelector('.navlinks');
+  if (!nav) return null;
+
+  let controls = document.getElementById('firebase-owner-controls');
+  if (!controls) {
+    controls = document.createElement('span');
+    controls.id = 'firebase-owner-controls';
+  }
+  if (controls.parentElement !== nav) nav.append(controls);
+  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px;white-space:nowrap';
+  return controls;
+}
+
+function removeStaticLoginButtons() {
+  const controls = document.getElementById('firebase-owner-controls');
+  document.querySelectorAll('button, a, [role="button"]').forEach(element => {
+    if (controls?.contains(element)) return;
+    if (/iniciar\s+sesi[oó]n\s+con\s+google/i.test(element.textContent.trim())) element.remove();
+  });
+  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
+    if (index > 0) element.remove();
+  });
+}
+
 function openLocalDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
@@ -38,12 +63,6 @@ async function putLocalRecord(record) {
   });
 }
 
-function cleanRecord(record) {
-  const clean = {};
-  for (const field of FIELDS) clean[field] = String(record[field] ?? '');
-  return clean;
-}
-
 function showMessage(text, kind = 'success') {
   const message = document.querySelector('#form-message');
   if (message) {
@@ -54,39 +73,12 @@ function showMessage(text, kind = 'success') {
 
 async function loadCloudRecords() {
   const snapshot = await getDocs(collection(db, 'provenance'));
-  const cloudRecords = snapshot.docs.map(item => {
+  const records = snapshot.docs.map(item => {
     const data = item.data();
     const createdAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
     return { ...data, id: item.id, createdAt, file: null, fileName: '' };
   });
-  for (const record of cloudRecords) await putLocalRecord(record);
-}
-
-function ensureAuthControls() {
-  const nav = document.querySelector('.navlinks');
-  if (!nav) return null;
-
-  document.querySelectorAll('#firebase-owner-controls').forAll?.(() => {});
-  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
-    if (index > 0) element.remove();
-  });
-
-  let controls = document.querySelector('#firebase-owner-controls');
-  if (!controls) {
-    controls = document.createElement('span');
-    controls.id = 'firebase-owner-controls';
-  }
-  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px;white-space:nowrap';
-  if (controls.parentElement !== nav) nav.append(controls);
-  return controls;
-}
-
-function removeDuplicateLoginButtons() {
-  ensureAuthControls();
-  document.querySelectorAll('button, a, [role="button"]').forEach(element => {
-    if (element.closest('#firebase-owner-controls')) return;
-    if (element.textContent.trim().toLowerCase().includes('iniciar sesión')) element.remove();
-  });
+  for (const record of records) await putLocalRecord(record);
 }
 
 async function login() {
@@ -97,11 +89,8 @@ async function login() {
   }
 }
 
-createAuthControls();
-
-function createAuthControls() {
-  ensureAuthControls();
-}
+const controls = ensureAuthControls();
+removeStaticLoginButtons();
 
 const pdfInput = document.querySelector('#file');
 if (pdfInput) {
@@ -111,17 +100,16 @@ if (pdfInput) {
 }
 
 onAuthStateChanged(auth, async user => {
-  removeDuplicateLoginButtons();
-  const controls = ensureAuthControls();
-  if (!controls) return;
-  controls.replaceChildren();
+  removeStaticLoginButtons();
+  const authControls = ensureAuthControls();
+  if (!authControls) return;
+  authControls.replaceChildren();
 
   const authorized = Boolean(user && user.email?.toLowerCase() === OWNER_EMAIL);
 
   if (authorized) {
     const status = document.createElement('span');
     status.className = 'hint';
-    status.style.cssText = 'white-space:nowrap';
     status.textContent = user.email;
 
     const logout = document.createElement('button');
@@ -129,8 +117,6 @@ onAuthStateChanged(auth, async user => {
     logout.type = 'button';
     logout.className = 'btn secondary';
     logout.textContent = 'Cerrar sesión';
-    logout.setAttribute('aria-label', 'Cerrar sesión de Google');
-    logout.title = 'Cerrar sesión';
     logout.addEventListener('click', async () => {
       logout.disabled = true;
       try {
@@ -141,8 +127,7 @@ onAuthStateChanged(auth, async user => {
         logout.disabled = false;
       }
     });
-
-    controls.append(status, logout);
+    authControls.append(status, logout);
 
     try {
       await loadCloudRecords();
@@ -152,14 +137,13 @@ onAuthStateChanged(auth, async user => {
     }
   } else {
     if (user) await signOut(auth);
-
     const loginButton = document.createElement('button');
     loginButton.id = 'firebase-login-button';
     loginButton.type = 'button';
     loginButton.className = 'btn';
     loginButton.textContent = 'Iniciar sesión con Google';
     loginButton.addEventListener('click', login);
-    controls.append(loginButton);
+    authControls.append(loginButton);
   }
 
   document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
@@ -169,11 +153,11 @@ onAuthStateChanged(auth, async user => {
   if (saveButton) saveButton.disabled = !authorized;
 });
 
-removeDuplicateLoginButtons();
-
-new MutationObserver(() => {
-  removeDuplicateLoginButtons();
-}).observe(document.documentElement, { childList: true, subtree: true });
+// Also remove any duplicate login control inserted later by static page markup.
+new MutationObserver(() => removeStaticLoginButtons()).observe(document.documentElement, {
+  childList: true,
+  subtree: true
+});
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
@@ -191,7 +175,6 @@ window.addEventListener('submit', async event => {
   form.querySelectorAll('[data-key]').forEach(element => {
     data[element.dataset.key] = element.value.trim();
   });
-
   if (!data.citation || !data.thesis) {
     showMessage('Completa el radicado y la tesis jurisprudencial.', 'error');
     return;
@@ -199,16 +182,15 @@ window.addEventListener('submit', async event => {
 
   const button = document.querySelector('#save-button');
   if (button) button.disabled = true;
-
   try {
     const id = crypto.randomUUID();
     await setDoc(doc(db, 'provenance', id), {
-      ...cleanRecord(data),
+      ...Object.fromEntries(FIELDS.map(field => [field, String(data[field] ?? '')])),
       ownerUid: user.uid,
       ownerEmail: user.email,
       createdAt: serverTimestamp()
     });
-    showMessage('Ficha guardada en Firestore. Los PDF no se guardan.', 'success');
+    showMessage('Ficha guardada en Firestore. No se subió ningún PDF.', 'success');
     form.reset();
   } catch (error) {
     showMessage(`No se pudo guardar la ficha: ${error.message}`, 'error');
