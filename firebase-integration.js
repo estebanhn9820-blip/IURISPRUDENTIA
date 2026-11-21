@@ -25,8 +25,8 @@ function createAuthControls() {
   if (!nav || document.querySelector('#firebase-owner-controls')) return;
   const controls = document.createElement('span');
   controls.id = 'firebase-owner-controls';
-  controls.style.cssText = 'display:flex;gap:8px;align-items:center';
-  nav.after(controls);
+  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px';
+  nav.append(controls);
 }
 
 function openLocalDatabase() {
@@ -93,6 +93,7 @@ onAuthStateChanged(auth, async user => {
   if (user && user.email === OWNER_EMAIL) {
     const status = document.createElement('span');
     status.className = 'hint';
+    status.style.cssText = 'white-space:nowrap';
     status.textContent = user.email;
 
     const logout = document.createElement('button');
