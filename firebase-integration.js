@@ -20,28 +20,40 @@ const DB_NAME = 'iurisprudentia';
 const STORE = 'sentences';
 const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate', 'magistrate', 'topic', 'subtopics', 'keywords', 'legalIssue', 'thesis', 'rules', 'reasoning', 'decision', 'otherDecision'];
 
-function ensureAuthControls() {
+function getAuthControl() {
   const nav = document.querySelector('.navlinks');
   if (!nav) return null;
 
-  let controls = document.getElementById('firebase-owner-controls');
+  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
+    if (index > 0) element.remove();
+  });
+
+  let controls = document.querySelector('#firebase-owner-controls');
   if (!controls) {
     controls = document.createElement('span');
     controls.id = 'firebase-owner-controls';
+    nav.append(controls);
   }
-  if (controls.parentElement !== nav) nav.append(controls);
-  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px;white-space:nowrap';
+  controls.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-left:12px;white-space:nowrap';
   return controls;
 }
 
-function removeStaticLoginButtons() {
-  const controls = document.getElementById('firebase-owner-controls');
-  document.querySelectorAll('button, a, [role="button"]').forEach(element => {
-    if (controls?.contains(element)) return;
-    if (/iniciar\s+sesi[oó]n\s+con\s+google/i.test(element.textContent.trim())) element.remove();
+function removeDuplicateAuthButtons() {
+  const controls = getAuthControl();
+  if (!controls) return;
+
+  document.querySelectorAll('.navlinks button, .navlinks [role="button"], .navlinks a').forEach(element => {
+    if (controls.contains(element) || element === controls) return;
+    if (/iniciar\s+sesi[oó]n\s+con\s+google|cerrar\s+sesi[oó]n/i.test(element.textContent.trim())) {
+      element.remove();
+    }
   });
-  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
-    if (index > 0) element.remove();
+
+  document.querySelectorAll('button, [role="button"], a').forEach(element => {
+    if (controls.contains(element)) return;
+    if (/iniciar\s+sesi[oó]n\s+con\s+google/i.test(element.textContent.trim())) {
+      element.remove();
+    }
   });
 }
 
@@ -63,6 +75,12 @@ async function putLocalRecord(record) {
   });
 }
 
+function cleanRecord(record) {
+  const clean = {};
+  for (const field of FIELDS) clean[field] = String(record[field] ?? '');
+  return clean;
+}
+
 function showMessage(text, kind = 'success') {
   const message = document.querySelector('#form-message');
   if (message) {
@@ -73,24 +91,18 @@ function showMessage(text, kind = 'success') {
 
 async function loadCloudRecords() {
   const snapshot = await getDocs(collection(db, 'provenance'));
-  const records = snapshot.docs.map(item => {
+  const cloudRecords = snapshot.docs.map(item => {
     const data = item.data();
     const createdAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
     return { ...data, id: item.id, createdAt, file: null, fileName: '' };
   });
-  for (const record of records) await putLocalRecord(record);
+  for (const record of cloudRecords) await putLocalRecord(record);
 }
 
 async function login() {
-  try {
-    await signInWithPopup(auth, provider);
-  } catch (error) {
-    alert(`No se pudo iniciar sesión: ${error.message}`);
-  }
+  try { await signInWithPopup(auth, provider); }
+  catch (error) { alert(`No se pudo iniciar sesión: ${error.message}`); }
 }
-
-const controls = ensureAuthControls();
-removeStaticLoginButtons();
 
 const pdfInput = document.querySelector('#file');
 if (pdfInput) {
@@ -100,10 +112,10 @@ if (pdfInput) {
 }
 
 onAuthStateChanged(auth, async user => {
-  removeStaticLoginButtons();
-  const authControls = ensureAuthControls();
-  if (!authControls) return;
-  authControls.replaceChildren();
+  removeDuplicateAuthButtons();
+  const controls = getAuthControl();
+  if (!controls) return;
+  controls.replaceChildren();
 
   const authorized = Boolean(user && user.email?.toLowerCase() === OWNER_EMAIL);
 
@@ -117,6 +129,7 @@ onAuthStateChanged(auth, async user => {
     logout.type = 'button';
     logout.className = 'btn secondary';
     logout.textContent = 'Cerrar sesión';
+    logout.setAttribute('aria-label', 'Cerrar sesión de Google');
     logout.addEventListener('click', async () => {
       logout.disabled = true;
       try {
@@ -127,7 +140,7 @@ onAuthStateChanged(auth, async user => {
         logout.disabled = false;
       }
     });
-    authControls.append(status, logout);
+    controls.append(status, logout);
 
     try {
       await loadCloudRecords();
@@ -143,7 +156,7 @@ onAuthStateChanged(auth, async user => {
     loginButton.className = 'btn';
     loginButton.textContent = 'Iniciar sesión con Google';
     loginButton.addEventListener('click', login);
-    authControls.append(loginButton);
+    controls.append(loginButton);
   }
 
   document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
@@ -151,13 +164,13 @@ onAuthStateChanged(auth, async user => {
   });
   const saveButton = document.querySelector('#save-button');
   if (saveButton) saveButton.disabled = !authorized;
+
+  removeDuplicateAuthButtons();
 });
 
-// Also remove any duplicate login control inserted later by static page markup.
-new MutationObserver(() => removeStaticLoginButtons()).observe(document.documentElement, {
-  childList: true,
-  subtree: true
-});
+removeDuplicateAuthButtons();
+new MutationObserver(removeDuplicateAuthButtons).observe(document.documentElement, { childList: true, subtree: true });
+setInterval(removeDuplicateAuthButtons, 1000);
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
@@ -175,6 +188,7 @@ window.addEventListener('submit', async event => {
   form.querySelectorAll('[data-key]').forEach(element => {
     data[element.dataset.key] = element.value.trim();
   });
+
   if (!data.citation || !data.thesis) {
     showMessage('Completa el radicado y la tesis jurisprudencial.', 'error');
     return;
@@ -182,10 +196,11 @@ window.addEventListener('submit', async event => {
 
   const button = document.querySelector('#save-button');
   if (button) button.disabled = true;
+
   try {
     const id = crypto.randomUUID();
     await setDoc(doc(db, 'provenance', id), {
-      ...Object.fromEntries(FIELDS.map(field => [field, String(data[field] ?? '')])),
+      ...cleanRecord(data),
       ownerUid: user.uid,
       ownerEmail: user.email,
       createdAt: serverTimestamp()
