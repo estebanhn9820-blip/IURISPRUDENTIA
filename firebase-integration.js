@@ -1,7 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
+import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAQl4ldky4k5GeRvqeztpjL5wr-mb-xJE',
@@ -15,9 +14,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 const OWNER_EMAIL = 'estebanhn9820@gmail.com';
+const DB_NAME = 'iurisprudentia';
+const STORE = 'sentences';
+const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate', 'magistrate', 'topic', 'subtopics', 'keywords', 'legalIssue', 'thesis', 'rules', 'reasoning', 'decision', 'otherDecision'];
 
 function createAuthControls() {
   const nav = document.querySelector('.navlinks');
@@ -28,14 +29,76 @@ function createAuthControls() {
   nav.after(controls);
 }
 
-createAuthControls();
+function openLocalDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getLocalRecords() {
+  const database = await openLocalDatabase();
+  return new Promise((resolve, reject) => {
+    const request = database.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+    request.onsuccess = () => { database.close(); resolve(request.result || []); };
+    request.onerror = () => { database.close(); reject(request.error); };
+  });
+}
+
+async function putLocalRecord(record) {
+  const database = await openLocalDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE, 'readwrite');
+    transaction.objectStore(STORE).put(record);
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
+  });
+}
+
+function cleanRecord(record) {
+  const clean = {};
+  for (const field of FIELDS) clean[field] = String(record[field] ?? '');
+  return clean;
+}
+
+function showMessage(text, kind = 'success') {
+  const message = document.querySelector('#form-message');
+  if (message) {
+    message.className = `message ${kind}`;
+    message.textContent = text;
+  }
+}
+
+async function loadCloudRecords() {
+  const snapshot = await getDocs(collection(db, 'provenance'));
+  const cloudRecords = snapshot.docs.map(item => {
+    const data = item.data();
+    const createdAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
+    return { ...data, id: item.id, createdAt, file: null, fileName: '' };
+  });
+
+  // Keep the existing interface working by mirroring cloud fichas to its local IndexedDB cache.
+  for (const record of cloudRecords) await putLocalRecord(record);
+  if (typeof window.loadRecords === 'function') await window.loadRecords();
+}
 
 async function login() {
   try { await signInWithPopup(auth, provider); }
-  catch (error) { alert(error.message); }
+  catch (error) { alert(`No se pudo iniciar sesión: ${error.message}`); }
 }
 
-onAuthStateChanged(auth, (user) => {
+createAuthControls();
+
+// Storage is not used: PDFs are optional and are not uploaded or synchronized.
+const pdfInput = document.querySelector('#file');
+if (pdfInput) {
+  pdfInput.required = false;
+  const label = document.querySelector('label[for="file"]');
+  if (label) label.textContent = 'PDF de la providencia (opcional; no se guarda en la nube)';
+}
+
+onAuthStateChanged(auth, async user => {
   const controls = document.querySelector('#firebase-owner-controls');
   if (!controls) return;
   controls.replaceChildren();
@@ -44,15 +107,20 @@ onAuthStateChanged(auth, (user) => {
     const status = document.createElement('span');
     status.className = 'hint';
     status.textContent = user.email;
-
     const logout = document.createElement('button');
     logout.type = 'button';
     logout.className = 'btn secondary';
     logout.textContent = 'Cerrar sesión';
     logout.addEventListener('click', () => signOut(auth));
     controls.append(status, logout);
+    try {
+      await loadCloudRecords();
+      showMessage('Conectado: las fichas se sincronizan con Firestore. Los PDF no se guardan.', 'success');
+    } catch (error) {
+      showMessage(`No se pudieron cargar las fichas de la nube: ${error.message}`, 'error');
+    }
   } else {
-    if (user) signOut(auth);
+    if (user) await signOut(auth);
     const loginButton = document.createElement('button');
     loginButton.type = 'button';
     loginButton.className = 'btn';
@@ -63,57 +131,50 @@ onAuthStateChanged(auth, (user) => {
 
   const authorized = Boolean(user && user.email === OWNER_EMAIL);
   document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
-    element.disabled = !authorized;
+    if (element.id !== 'file') element.disabled = !authorized;
   });
   const saveButton = document.querySelector('#save-button');
   if (saveButton) saveButton.disabled = !authorized;
 });
 
-window.addEventListener('submit', async (event) => {
+window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
   event.preventDefault();
   event.stopImmediatePropagation();
 
   const user = auth.currentUser;
-  const message = document.querySelector('#form-message');
   if (!user || user.email !== OWNER_EMAIL) {
-    if (message) { message.className = 'message error'; message.textContent = 'Debes iniciar sesión con la cuenta autorizada.'; }
+    showMessage('Inicia sesión con la cuenta autorizada para guardar una ficha.', 'error');
     return;
   }
 
   const form = event.target;
-  const file = document.querySelector('#file')?.files?.[0];
-  const citation = form.querySelector('[data-key="citation"]')?.value.trim();
-  const thesis = form.querySelector('[data-key="thesis"]')?.value.trim();
-  if (!file || !citation || !thesis) {
-    if (message) { message.className = 'message error'; message.textContent = 'Completa los campos obligatorios y selecciona el PDF.'; }
+  const data = {};
+  form.querySelectorAll('[data-key]').forEach(element => { data[element.dataset.key] = element.value.trim(); });
+  if (!data.citation || !data.thesis) {
+    showMessage('Completa el radicado y la tesis jurisprudencial.', 'error');
     return;
   }
 
   const button = document.querySelector('#save-button');
   if (button) button.disabled = true;
-
   try {
-    const data = {};
-    form.querySelectorAll('[data-key]').forEach(element => { data[element.dataset.key] = element.value.trim(); });
-
     const id = crypto.randomUUID();
-    const fileRef = ref(storage, `provenance/${id}/${file.name}`);
-    await uploadBytes(fileRef, file, { contentType: 'application/pdf' });
-
-    data.ownerUid = user.uid;
-    data.ownerEmail = user.email;
-    data.fileName = file.name;
-    data.filePath = fileRef.fullPath;
-    data.fileUrl = await getDownloadURL(fileRef);
-    data.createdAt = serverTimestamp();
-
-    await addDoc(collection(db, 'provenance'), data);
-
-    if (message) { message.className = 'message success'; message.textContent = 'Ficha y PDF guardados en la nube.'; }
+    const record = {
+      ...cleanRecord(data),
+      ownerUid: user.uid,
+      ownerEmail: user.email,
+      createdAt: new Date().toISOString(),
+      file: null,
+      fileName: ''
+    };
+    await setDoc(doc(db, 'provenance', id), { ...cleanRecord(data), ownerUid: user.uid, ownerEmail: user.email, createdAt: serverTimestamp() });
+    await putLocalRecord({ ...record, createdAt: new Date().toISOString() });
+    if (typeof window.loadRecords === 'function') await window.loadRecords();
+    showMessage('Ficha guardada en Firestore. No se subió ningún PDF.', 'success');
     form.reset();
   } catch (error) {
-    if (message) { message.className = 'message error'; message.textContent = error.message; }
+    showMessage(`No se pudo guardar la ficha: ${error.message}`, 'error');
   } finally {
     if (button) button.disabled = false;
   }
