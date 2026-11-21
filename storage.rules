@@ -1,10 +1,12 @@
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
-    match /provenance/{document=**} {
+    match /provenance/{userId}/{fileName} {
       allow read, write: if request.auth != null
-        && request.auth.token.email == 'estebanhn9820@gmail.com';
+        && request.auth.uid == userId
+        && request.auth.token.email == 'estebanhn9820@gmail.com'
+        && request.resource.size < 25 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
     }
   }
 }
