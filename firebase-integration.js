@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyAQl4ldky4k5GCeRvoaztpjLISw-mb-xJE',
+  apiKey: 'AIzaSyAQl4ldky4k5GeRvqeztpjL5wr-mb-xJE',
   authDomain: 'iurisprudentia-40ac5.firebaseapp.com',
   projectId: 'iurisprudentia-40ac5',
   storageBucket: 'iurisprudentia-40ac5.firebasestorage.app',
@@ -20,40 +20,28 @@ const DB_NAME = 'iurisprudentia';
 const STORE = 'sentences';
 const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate', 'magistrate', 'topic', 'subtopics', 'keywords', 'legalIssue', 'thesis', 'rules', 'reasoning', 'decision', 'otherDecision'];
 
-function getAuthControl() {
+function ensureAuthControls() {
   const nav = document.querySelector('.navlinks');
   if (!nav) return null;
 
-  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
-    if (index > 0) element.remove();
-  });
-
-  let controls = document.querySelector('#firebase-owner-controls');
+  // Keep exactly one auth container, placed within the top navigation.
+  const containers = [...document.querySelectorAll('#firebase-owner-controls')];
+  let controls = containers.shift();
+  containers.forEach(element => element.remove());
   if (!controls) {
     controls = document.createElement('span');
     controls.id = 'firebase-owner-controls';
-    nav.append(controls);
   }
+  if (controls.parentElement !== nav) nav.append(controls);
   controls.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-left:12px;white-space:nowrap';
   return controls;
 }
 
-function removeDuplicateAuthButtons() {
-  const controls = getAuthControl();
-  if (!controls) return;
-
-  document.querySelectorAll('.navlinks button, .navlinks [role="button"], .navlinks a').forEach(element => {
-    if (controls.contains(element) || element === controls) return;
-    if (/iniciar\s+sesi[oó]n\s+con\s+google|cerrar\s+sesi[oó]n/i.test(element.textContent.trim())) {
-      element.remove();
-    }
-  });
-
-  document.querySelectorAll('button, [role="button"], a').forEach(element => {
-    if (controls.contains(element)) return;
-    if (/iniciar\s+sesi[oó]n\s+con\s+google/i.test(element.textContent.trim())) {
-      element.remove();
-    }
+function removeStaticLoginButtons() {
+  const controls = document.getElementById('firebase-owner-controls');
+  document.querySelectorAll('button, a, [role="button"]').forEach(element => {
+    if (controls?.contains(element)) return;
+    if (/^iniciar\s+sesi[oó]n\s+con\s+google$/i.test(element.textContent.trim())) element.remove();
   });
 }
 
@@ -100,8 +88,11 @@ async function loadCloudRecords() {
 }
 
 async function login() {
-  try { await signInWithPopup(auth, provider); }
-  catch (error) { alert(`No se pudo iniciar sesión: ${error.message}`); }
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    alert(`No se pudo iniciar sesión: ${error.message}`);
+  }
 }
 
 const pdfInput = document.querySelector('#file');
@@ -111,45 +102,38 @@ if (pdfInput) {
   if (label) label.textContent = 'PDF de la providencia (opcional; no se guarda en la nube)';
 }
 
-onAuthStateChanged(auth, async user => {
-  removeDuplicateAuthButtons();
-  const controls = getAuthControl();
+function renderAuthControls(user) {
+  removeStaticLoginButtons();
+  const controls = ensureAuthControls();
   if (!controls) return;
   controls.replaceChildren();
 
-  const authorized = Boolean(user && user.email?.toLowerCase() === OWNER_EMAIL);
-
-  if (authorized) {
-    const status = document.createElement('span');
-    status.className = 'hint';
-    status.textContent = user.email;
+  // Any authenticated user gets a user indicator and logout control. Only the
+  // configured owner is authorized to create records in this app.
+  if (user) {
+    const identity = document.createElement('span');
+    identity.className = 'hint';
+    identity.style.cssText = 'white-space:nowrap';
+    identity.textContent = user.displayName || user.email || 'Usuario conectado';
 
     const logout = document.createElement('button');
     logout.id = 'firebase-logout-button';
     logout.type = 'button';
     logout.className = 'btn secondary';
     logout.textContent = 'Cerrar sesión';
-    logout.setAttribute('aria-label', 'Cerrar sesión de Google');
+    logout.setAttribute('aria-label', 'Cerrar sesión');
     logout.addEventListener('click', async () => {
       logout.disabled = true;
       try {
         await signOut(auth);
-        showMessage('Sesión cerrada correctamente.', 'success');
+        window.location.assign('./');
       } catch (error) {
         showMessage(`No se pudo cerrar la sesión: ${error.message}`, 'error');
         logout.disabled = false;
       }
     });
-    controls.append(status, logout);
-
-    try {
-      await loadCloudRecords();
-      showMessage('Conectado: las fichas se sincronizan con Firestore. Los PDF no se guardan.', 'success');
-    } catch (error) {
-      showMessage(`No se pudieron cargar las fichas de la nube: ${error.message}`, 'error');
-    }
+    controls.append(identity, logout);
   } else {
-    if (user) await signOut(auth);
     const loginButton = document.createElement('button');
     loginButton.id = 'firebase-login-button';
     loginButton.type = 'button';
@@ -159,18 +143,31 @@ onAuthStateChanged(auth, async user => {
     controls.append(loginButton);
   }
 
+  const authorized = Boolean(user && user.email?.toLowerCase() === OWNER_EMAIL);
   document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
     if (element.id !== 'file') element.disabled = !authorized;
   });
   const saveButton = document.querySelector('#save-button');
   if (saveButton) saveButton.disabled = !authorized;
 
-  removeDuplicateAuthButtons();
-});
+  if (authorized) {
+    loadCloudRecords().then(() => {
+      showMessage('Conectado: las fichas se sincronizan con Firestore. Los PDF no se guardan.', 'success');
+    }).catch(error => {
+      showMessage(`No se pudieron cargar las fichas de la nube: ${error.message}`, 'error');
+    });
+  }
+}
 
-removeDuplicateAuthButtons();
-new MutationObserver(removeDuplicateAuthButtons).observe(document.documentElement, { childList: true, subtree: true });
-setInterval(removeDuplicateAuthButtons, 1000);
+// Clear duplicate static controls immediately, then keep the navigation in sync
+// if the page markup or another script inserts an old login button later.
+ensureAuthControls();
+removeStaticLoginButtons();
+new MutationObserver(() => {
+  removeStaticLoginButtons();
+  ensureAuthControls();
+}).observe(document.documentElement, { childList: true, subtree: true });
+onAuthStateChanged(auth, renderAuthControls);
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
@@ -188,7 +185,6 @@ window.addEventListener('submit', async event => {
   form.querySelectorAll('[data-key]').forEach(element => {
     data[element.dataset.key] = element.value.trim();
   });
-
   if (!data.citation || !data.thesis) {
     showMessage('Completa el radicado y la tesis jurisprudencial.', 'error');
     return;
@@ -196,7 +192,6 @@ window.addEventListener('submit', async event => {
 
   const button = document.querySelector('#save-button');
   if (button) button.disabled = true;
-
   try {
     const id = crypto.randomUUID();
     await setDoc(doc(db, 'provenance', id), {
