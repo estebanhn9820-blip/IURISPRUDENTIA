@@ -2,14 +2,23 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: 'AIzaSyAQl4ldky4k5GeRvqeztpjL5wr-mb-xJE',
-  authDomain: 'iurisprudentia-40ac5.firebaseapp.com',
-  projectId: 'iurisprudentia-40ac5',
-  storageBucket: 'iurisprudentia-40ac5.firebasestorage.app',
-  messagingSenderId: '358518113591',
-  appId: '1:358518113591:web:7fb1497a724fe5e55dd862'
+  apiKey: "AIzaSyAQl4ldky4k5GCeRvoaztpjLISw-mb-xJE",
+  authDomain: "iurisprudentia-40ac5.firebaseapp.com",
+  projectId: "iurisprudentia-40ac5",
+  storageBucket: "iurisprudentia-40ac5.firebasestorage.app",
+  messagingSenderId: "358518113591",
+  appId: "1:358518113591:web:9b1497a724fe5e55dd86b2"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
