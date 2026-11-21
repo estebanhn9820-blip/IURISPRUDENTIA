@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyAQl4ldky4k5GeRvqeztpjL5wr-mb-xJE',
+  apiKey: 'AIzaSyAQl4ldky4k5GCeRvoaztpjLISw-mb-xJE',
   authDomain: 'iurisprudentia-40ac5.firebaseapp.com',
   projectId: 'iurisprudentia-40ac5',
   storageBucket: 'iurisprudentia-40ac5.firebasestorage.app',
@@ -24,7 +24,6 @@ function ensureAuthControls() {
   const nav = document.querySelector('.navlinks');
   if (!nav) return null;
 
-  // Keep exactly one auth container, placed within the top navigation.
   const containers = [...document.querySelectorAll('#firebase-owner-controls')];
   let controls = containers.shift();
   containers.forEach(element => element.remove());
@@ -108,8 +107,6 @@ function renderAuthControls(user) {
   if (!controls) return;
   controls.replaceChildren();
 
-  // Any authenticated user gets a user indicator and logout control. Only the
-  // configured owner is authorized to create records in this app.
   if (user) {
     const identity = document.createElement('span');
     identity.className = 'hint';
@@ -159,8 +156,6 @@ function renderAuthControls(user) {
   }
 }
 
-// Clear duplicate static controls immediately, then keep the navigation in sync
-// if the page markup or another script inserts an old login button later.
 ensureAuthControls();
 removeStaticLoginButtons();
 new MutationObserver(() => {
