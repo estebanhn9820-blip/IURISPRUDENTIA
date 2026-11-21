@@ -3,12 +3,12 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAQl4ldky4k5GCeRvoaztpjLISw-mb-xJE",
-  authDomain: "iurisprudentia-40ac5.firebaseapp.com",
-  projectId: "iurisprudentia-40ac5",
-  storageBucket: "iurisprudentia-40ac5.firebasestorage.app",
-  messagingSenderId: "358518113591",
-  appId: "1:358518113591:web:9b1497a724fe5e55dd86b2"
+  apiKey: 'AIzaSyAQl4ldky4k5GeRvqeztpjL5wr-mb-xJE',
+  authDomain: 'iurisprudentia-40ac5.firebaseapp.com',
+  projectId: 'iurisprudentia-40ac5',
+  storageBucket: 'iurisprudentia-40ac5.firebasestorage.app',
+  messagingSenderId: '358518113591',
+  appId: '1:358518113591:web:7fb1497a724fe5e55dd862'
 };
 
 const app = initializeApp(firebaseConfig);
@@ -34,15 +34,6 @@ function openLocalDatabase() {
     const request = indexedDB.open(DB_NAME, 1);
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
-  });
-}
-
-async function getLocalRecords() {
-  const database = await openLocalDatabase();
-  return new Promise((resolve, reject) => {
-    const request = database.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-    request.onsuccess = () => { database.close(); resolve(request.result || []); };
-    request.onerror = () => { database.close(); reject(request.error); };
   });
 }
 
@@ -103,12 +94,14 @@ onAuthStateChanged(auth, async user => {
     const status = document.createElement('span');
     status.className = 'hint';
     status.textContent = user.email;
+
     const logout = document.createElement('button');
     logout.type = 'button';
     logout.className = 'btn secondary';
     logout.textContent = 'Cerrar sesión';
     logout.addEventListener('click', () => signOut(auth));
     controls.append(status, logout);
+
     try {
       await loadCloudRecords();
       showMessage('Conectado: las fichas se sincronizan con Firestore. Los PDF no se guardan.', 'success');
@@ -135,7 +128,7 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
-  event.preventEvent?.();
+  event.preventDefault();
   event.stopImmediatePropagation();
 
   const user = auth.currentUser;
@@ -147,6 +140,7 @@ window.addEventListener('submit', async event => {
   const form = event.target;
   const data = {};
   form.querySelectorAll('[data-key]').forEach(element => { data[element.dataset.key] = element.value.trim(); });
+
   if (!data.citation || !data.thesis) {
     showMessage('Completa el radicado y la tesis jurisprudencial.', 'error');
     return;
@@ -154,6 +148,7 @@ window.addEventListener('submit', async event => {
 
   const button = document.querySelector('#save-button');
   if (button) button.disabled = true;
+
   try {
     const id = crypto.randomUUID();
     await setDoc(doc(db, 'provenance', id), {
