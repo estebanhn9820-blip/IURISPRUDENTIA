@@ -22,11 +22,21 @@ const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate'
 
 function createAuthControls() {
   const nav = document.querySelector('.navlinks');
-  if (!nav || document.querySelector('#firebase-owner-controls')) return;
-  const controls = document.createElement('span');
-  controls.id = 'firebase-owner-controls';
+  if (!nav) return;
+
+  // Elimina controles antiguos o duplicados creados por cargas anteriores.
+  const existing = document.querySelectorAll('#firebase-owner-controls');
+  existing.forEach((element, index) => {
+    if (index > 0) element.remove();
+  });
+
+  let controls = document.querySelector('#firebase-owner-controls');
+  if (!controls) {
+    controls = document.createElement('span');
+    controls.id = 'firebase-owner-controls';
+  }
   controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px';
-  nav.append(controls);
+  if (controls.parentElement !== nav) nav.append(controls);
 }
 
 function openLocalDatabase() {
@@ -86,11 +96,12 @@ if (pdfInput) {
 }
 
 onAuthStateChanged(auth, async user => {
+  createAuthControls();
   const controls = document.querySelector('#firebase-owner-controls');
   if (!controls) return;
   controls.replaceChildren();
 
-  if (user && user.email === OWNER_EMAIL) {
+  if (user && user.email?.toLowerCase() === OWNER_EMAIL) {
     const status = document.createElement('span');
     status.className = 'hint';
     status.style.cssText = 'white-space:nowrap';
@@ -131,7 +142,7 @@ onAuthStateChanged(auth, async user => {
     controls.append(loginButton);
   }
 
-  const authorized = Boolean(user && user.email === OWNER_EMAIL);
+  const authorized = Boolean(user && user.email?.toLowerCase() === OWNER_EMAIL);
   document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
     if (element.id !== 'file') element.disabled = !authorized;
   });
@@ -141,11 +152,12 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
+  event.preventEventDefault?.();
   event.preventDefault();
   event.stopImmediatePropagation();
 
   const user = auth.currentUser;
-  if (!user || user.email !== OWNER_EMAIL) {
+  if (!user || user.email?.toLowerCase() !== OWNER_EMAIL) {
     showMessage('Inicia sesión con la cuenta autorizada para guardar una ficha.', 'error');
     return;
   }
