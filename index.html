@@ -35,14 +35,7 @@ async function dbAction(mode,operation){const db=await openDatabase();return new
 function migrateRecord(record){const migrated={...record};migrated.corporation||='Corte Suprema de Justicia';migrated.chamber||='Sala de Casación Penal';migrated.caseType||='';migrated.keywords||='';migrated.thesis||=record.summary||'';migrated.reasoning||=record.resolutionMethod||'';migrated.decision||=record.ruling||'';migrated.otherDecision||='';migrated.createdAt||=new Date().toISOString();return migrated}
 async function loadRecords(){try{records=(await dbAction('readonly',store=>store.getAll())).map(migrateRecord);records.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));render()}catch(error){$('#cards').innerHTML=`<div class="empty">No se pudo abrir el almacenamiento local: ${esc(error.message)}</div>`}}
 function valueFor(record,key){if(key==='decision'&&record.decision==='Otro'&&record.otherDecision)return`Otro: ${record.otherDecision}`;return record[key]||''}
-function splitItems(value){
-
-    return String(value || '')
-        .split('\n')
-        .map(item => item.trim())
-        .filter(Boolean);
-
-}
+function splitItems(value){return String(value||'').split(/[\n,;]+/).map(item=>item.trim()).filter(Boolean)}
 function makeAccordion(title,icon,content,open=false){return`<details${open?' open':''}><summary><span class="summary-icon" aria-hidden="true">${icon}</span>${title}</summary><div class="accordion-content">${content||'<span class="no-content">Sin información registrada.</span>'}</div></details>`}
 function renderCard(record){const keywords=splitItems(record.keywords);const rules=splitItems(record.rules);const rulesHTML=rules.length?`<ol class="rule-list">${rules.map(rule=>`<li>${esc(rule)}</li>`).join('')}</ol>`:'<span class="no-content">Sin reglas registradas.</span>';const keywordHTML=keywords.length?`<div class="keywords" aria-label="Palabras clave">${keywords.map(keyword=>`<span class="keyword">${esc(keyword)}</span>`).join('')}</div>`:'';const decision=record.decision==='Otro'&&record.otherDecision?record.otherDecision:record.decision;const problem=record.legalIssue?`<section class="problem-feature"><div class="problem-label">Problema jurídico</div><p class="problem-text">${esc(record.legalIssue)}</p></section>`:'';const pdf=record.file?`<div class="pdf-actions"><button class="btn secondary" data-action="view" data-id="${esc(record.id)}" type="button">Abrir PDF</button><button class="btn secondary" data-action="download" data-id="${esc(record.id)}" type="button">Descargar PDF · ${esc(record.filename||'Providencia.pdf')}</button></div>`:'<span class="no-content">No hay PDF asociado a esta ficha.</span>';return`<article class="card"><header class="case-head"><div class="case-kicker">Providencia · ${esc(record.chamber||'Sala no registrada')}</div><h3 class="case-citation">${esc(record.citation||'Radicado no registrado')}</h3><div class="meta-grid"><div><span class="meta-label">Corporación</span><span class="meta-value">${esc(record.corporation||'—')}</span></div><div><span class="meta-label">Fecha</span><span class="meta-value">${esc(record.decisionDate||'No registrada')}</span></div><div><span class="meta-label">Magistrado ponente</span><span class="meta-value">${esc(record.magistrate||'No registrado')}</span></div><div><span class="meta-label">Sala</span><span class="meta-value">${esc(record.chamber||'—')}</span></div></div><div class="topic-line"><span class="meta-label">Tema principal</span><span class="topic-value">${esc(record.topic||'Tema no registrado')}</span></div><div class="case-badges">${record.caseType?`<span class="badge type">${esc(record.caseType)}</span>`:''}${decision?`<span class="badge decision">Decisión · ${esc(decision)}</span>`:''}</div></header><section class="thesis-card"><div class="thesis-label">Tesis jurisprudencial</div><blockquote class="thesis-text">${esc(record.thesis||'Tesis pendiente de registrar.')}</blockquote></section>${problem}${keywordHTML}<div class="card-accordions">${makeAccordion('Reglas jurisprudenciales','§',rulesHTML)}${makeAccordion('Fundamento de la decisión','✦',esc(record.reasoning||''))}${makeAccordion('Subtemas','⌕',esc(record.subtopics||''))}${makeAccordion('PDF de la providencia','▤',pdf)}</div><div class="card-actions"><button class="btn secondary" data-action="edit" data-id="${esc(record.id)}" type="button">Editar ficha</button><button class="btn danger" data-action="delete" data-id="${esc(record.id)}" type="button">Eliminar</button></div></article>`}
 function scoreRecord(record,query,expanded){if(!query)return 0;let score=0;const original=normalizeText(query);for(const[field,weight]of SEARCH_FIELDS){const text=normalizeText(record[field]);if(!text)continue;if(text===original)score+=weight*12;else if(text.includes(original))score+=weight*8;for(const term of expanded){if(term===original)continue;if(text===term)score+=weight*10;else if(text.includes(term))score+=weight*6}const words=original.split(' ').filter(word=>word.length>1);if(words.length>1)score+=weight*words.filter(word=>text.includes(word)).length/words.length*2}return score}
@@ -51,64 +44,13 @@ function readFields(form){const data={};form.querySelectorAll('[data-key]').forE
 function buildEditFields(){const sections=[['Identificación',[['citation','Radicado','text'],['corporation','Corporación','text'],['chamber','Sala o Sección','text'],['caseType','Tipo de providencia','case'],['decisionDate','Fecha','date'],['magistrate','Magistrado/a ponente','text']]],['Clasificación temática',[['topic','Tema principal','text'],['subtopics','Subtemas','text'],['keywords','Palabras clave','text']]],['Contenido jurisprudencial',[['legalIssue','Problema jurídico','textarea'],['thesis','Tesis jurisprudencial','textarea'],['rules','Reglas jurisprudenciales','textarea'],['reasoning','Fundamento de la decisión','textarea']]],['Decisión',[['decision','Decisión','decision'],['otherDecision','Especifica otra decisión','text']]]];$('#edit-fields').innerHTML=sections.map(([title,fields])=>`<section class="form-section"><h3>${title}</h3><div class="grid">${fields.map(([key,label,type])=>{let input;if(type==='case')input='<select data-key="caseType"><option value="">Seleccionar</option><option>Sentencia</option><option>Auto</option><option>Providencia</option></select>';else if(type==='decision')input='<select data-key="decision"><option value="">Seleccionar</option><option>Casa</option><option>Confirma</option><option>Revoca</option><option>Declara nulidad</option><option>Niega nulidad</option><option>Precluye</option><option>Otro</option></select>';else if(type==='textarea')input=`<textarea data-key="${key}" ${key==='thesis'?'required':''}></textarea>`;else input=`<input data-key="${key}" type="${type}" maxlength="500" ${key==='citation'?'required':''}>`;return`<div class="field ${type==='textarea'?'full':''}"><label>${label}</label>${input}</div>`}).join('')}</div></section>`).join('')}
 $('#decision').addEventListener('change',()=>$('#other-decision-wrap').hidden=$('#decision').value!=='Otro');
 $('#record-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,button=$('#save-button'),message=$('#form-message'),file=$('#file').files[0];button.disabled=true;message.className='message';message.textContent='Guardando ficha…';try{if(!file)throw new Error('Selecciona el PDF de la providencia.');if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf'))throw new Error('El documento debe ser PDF.');if(file.size>MAX_FILE_SIZE)throw new Error('El PDF supera el límite de 25 MB.');const data=readFields(form);if(!data.thesis)throw new Error('La tesis jurisprudencial es obligatoria.');const record={...data,id:crypto.randomUUID(),filename:file.name,file,createdAt:new Date().toISOString()};await dbAction('readwrite',store=>store.add(record));message.className='message success';message.textContent='Ficha jurisprudencial guardada.';form.reset();$('#corporation').value='Corte Suprema de Justicia';$('#chamber').value='Sala de Casación Penal';$('#other-decision-wrap').hidden=true;await loadRecords();$('#biblioteca').scrollIntoView({behavior:'smooth'})}catch(error){message.className='message error';message.textContent=error.name==='QuotaExceededError'?'No hay espacio suficiente en el navegador; elimina o descarga archivos para liberar espacio.':error.message||'No se pudo guardar la ficha.'}finally{button.disabled=false}});
-let searchTimeout;
-$('#search').addEventListener('input', () => {
-
-    clearTimeout(searchTimeout);
-
-    searchTimeout = setTimeout(() => {
-
-        render();
-
-    }, 300);
-
-});
-$('#cards').addEventListener('click',async event=>{const button=event.target.closest('button[data-action]');if(!button)return;const record=records.find(item=>item.id===button.dataset.id);if(!record)return;try{switch(button.dataset.action)case 'delete':
-
-    const confirmar = confirm(
-`¿Está seguro de eliminar la ficha:
-
-${record.citation}
-
-Esta acción no puede deshacerse.`
-    );
-
-    if(!confirmar){
-        break;
-    }
-
-    await dbAction(
-        'readwrite',
-        store => store.delete(record.id)
-    );
-
-    await loadRecords();
-
-break;;case'download':if(record.file){const url=URL.createObjectURL(record.file),link=document.createElement('a');link.href=url;link.download=record.filename||`${record.citation}.pdf`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}else alert('Esta ficha no tiene un PDF guardado.');break;case'view':if(!record.file){alert('Esta ficha no tiene un PDF guardado.');break}if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(record.file);$('#pdf-title').textContent=record.citation||'Providencia';$('#pdf-frame').src=objectUrl;$('#pdf-dialog').showModal();break;case 'edit':
-
-    $('#edit-id').value = record.id;
-
-    const campos = $('#edit-form')
-        .querySelectorAll('[data-key]');
-
-    campos.forEach(campo => {
-
-        const key = campo.dataset.key;
-
-        campo.value = record[key] || '';
-
-    });
-
-    $('#edit-message').textContent = '';
-
-    $('#edit-dialog').showModal();
-
-break;}}catch(error){alert(error.message||'No se pudo completar la operación.')}});
+$('#search').addEventListener('input',render);
+$('#cards').addEventListener('click',async event=>{const button=event.target.closest('button[data-action]');if(!button)return;const record=records.find(item=>item.id===button.dataset.id);if(!record)return;try{switch(button.dataset.action){case'delete':if(confirm(`¿Eliminar la ficha “${record.citation}” y su PDF de este navegador?`)){await dbAction('readwrite',store=>store.delete(record.id));await loadRecords()}break;case'download':if(record.file){const url=URL.createObjectURL(record.file),link=document.createElement('a');link.href=url;link.download=record.filename||`${record.citation}.pdf`;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}else alert('Esta ficha no tiene un PDF guardado.');break;case'view':if(!record.file){alert('Esta ficha no tiene un PDF guardado.');break}if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(record.file);$('#pdf-title').textContent=record.citation||'Providencia';$('#pdf-frame').src=objectUrl;$('#pdf-dialog').showModal();break;case'edit':$('#edit-id').value=record.id;$('#edit-form').querySelectorAll('[data-key]').forEach(element=>element.value=record[element.dataset.key]||'');$('#edit-message').textContent='';$('#edit-dialog').showModal();break}}catch(error){alert(error.message||'No se pudo completar la operación.')}});
 $('#edit-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,message=$('#edit-message');try{const id=$('#edit-id').value,old=records.find(item=>item.id===id);if(!old)throw new Error('No se encontró la ficha.');const updated={...old,...readFields(form)};await dbAction('readwrite',store=>store.put(updated));message.className='message success';message.textContent='Cambios guardados.';await loadRecords();setTimeout(()=>$('#edit-dialog').close(),350)}catch(error){message.className='message error';message.textContent=error.message||'No se pudo actualizar.'}});
 function closePdf(){if($('#pdf-dialog').open)$('#pdf-dialog').close();$('#pdf-frame').removeAttribute('src');if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null}}$('#close-pdf').addEventListener('click',closePdf);$('#pdf-dialog').addEventListener('click',event=>{if(event.target===$('#pdf-dialog'))closePdf()});$('#close-edit').addEventListener('click',()=>$('#edit-dialog').close());$('#edit-dialog').addEventListener('click',event=>{if(event.target===$('#edit-dialog'))$('#edit-dialog').close()});buildEditFields();loadRecords();
 </script>
 <script type="module" src="./record-edit-controls.js"></script>
-<script type="module" src="./record-edit-controls.js"></script>
+<script type="module" src="./firebase-integration.js"></script>
 <script type="module" src="./firebase-integration.js"></script>
 </body>
 </html>
