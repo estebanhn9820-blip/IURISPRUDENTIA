@@ -16,27 +16,77 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 const OWNER_EMAIL = 'estebanhn9820@gmail.com';
+const DB_NAME = 'iurisprudentia';
+const STORE = 'sentences';
+const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate', 'magistrate', 'topic', 'subtopics', 'keywords', 'legalIssue', 'thesis', 'rules', 'reasoning', 'decision', 'otherDecision'];
 
-function removeAllLoginButtons() {
-  document.querySelectorAll('button, a, [role="button"]').forEach(element => {
-    if (element.textContent.trim().toLowerCase().includes('iniciar sesión')) element.remove();
+function openLocalDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
   });
-  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
-    if (index > 0) element.remove();
+}
+
+async function putLocalRecord(record) {
+  const database = await openLocalDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE, 'readwrite');
+    transaction.objectStore(STORE).put(record);
+    transaction.oncomplete = () => { database.close(); resolve(); };
+    transaction.onerror = () => { database.close(); reject(transaction.error); };
   });
+}
+
+function cleanRecord(record) {
+  const clean = {};
+  for (const field of FIELDS) clean[field] = String(record[field] ?? '');
+  return clean;
+}
+
+function showMessage(text, kind = 'success') {
+  const message = document.querySelector('#form-message');
+  if (message) {
+    message.className = `message ${kind}`;
+    message.textContent = text;
+  }
+}
+
+async function loadCloudRecords() {
+  const snapshot = await getDocs(collection(db, 'provenance'));
+  const cloudRecords = snapshot.docs.map(item => {
+    const data = item.data();
+    const createdAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
+    return { ...data, id: item.id, createdAt, file: null, fileName: '' };
+  });
+  for (const record of cloudRecords) await putLocalRecord(record);
 }
 
 function ensureAuthControls() {
   const nav = document.querySelector('.navlinks');
   if (!nav) return null;
+
+  document.querySelectorAll('#firebase-owner-controls').forAll?.(() => {});
+  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
+    if (index > 0) element.remove();
+  });
+
   let controls = document.querySelector('#firebase-owner-controls');
   if (!controls) {
     controls = document.createElement('span');
     controls.id = 'firebase-owner-controls';
   }
+  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px;white-space:nowrap';
   if (controls.parentElement !== nav) nav.append(controls);
-  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px';
   return controls;
+}
+
+function removeDuplicateLoginButtons() {
+  ensureAuthControls();
+  document.querySelectorAll('button, a, [role="button"]').forEach(element => {
+    if (element.closest('#firebase-owner-controls')) return;
+    if (element.textContent.trim().toLowerCase().includes('iniciar sesión')) element.remove();
+  });
 }
 
 async function login() {
@@ -47,8 +97,21 @@ async function login() {
   }
 }
 
+createAuthControls();
+
+function createAuthControls() {
+  ensureAuthControls();
+}
+
+const pdfInput = document.querySelector('#file');
+if (pdfInput) {
+  pdfInput.required = false;
+  const label = document.querySelector('label[for="file"]');
+  if (label) label.textContent = 'PDF de la providencia (opcional; no se guarda en la nube)';
+}
+
 onAuthStateChanged(auth, async user => {
-  removeAllLoginButtons();
+  removeDuplicateLoginButtons();
   const controls = ensureAuthControls();
   if (!controls) return;
   controls.replaceChildren();
@@ -70,10 +133,23 @@ onAuthStateChanged(auth, async user => {
     logout.title = 'Cerrar sesión';
     logout.addEventListener('click', async () => {
       logout.disabled = true;
-      await signOut(auth);
+      try {
+        await signOut(auth);
+        showMessage('Sesión cerrada correctamente.', 'success');
+      } catch (error) {
+        showMessage(`No se pudo cerrar la sesión: ${error.message}`, 'error');
+        logout.disabled = false;
+      }
     });
 
     controls.append(status, logout);
+
+    try {
+      await loadCloudRecords();
+      showMessage('Conectado: las fichas se sincronizan con Firestore. Los PDF no se guardan.', 'success');
+    } catch (error) {
+      showMessage(`No se pudieron cargar las fichas de la nube: ${error.message}`, 'error');
+    }
   } else {
     if (user) await signOut(auth);
 
@@ -93,6 +169,12 @@ onAuthStateChanged(auth, async user => {
   if (saveButton) saveButton.disabled = !authorized;
 });
 
+removeDuplicateLoginButtons();
+
+new MutationObserver(() => {
+  removeDuplicateLoginButtons();
+}).observe(document.documentElement, { childList: true, subtree: true });
+
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
   event.preventDefault();
@@ -100,11 +182,7 @@ window.addEventListener('submit', async event => {
 
   const user = auth.currentUser;
   if (!user || user.email?.toLowerCase() !== OWNER_EMAIL) {
-    const message = document.querySelector('#form-message');
-    if (message) {
-      message.className = 'message error';
-      message.textContent = 'Inicia sesión con la cuenta autorizada para guardar una ficha.';
-    }
+    showMessage('Inicia sesión con la cuenta autorizada para guardar una ficha.', 'error');
     return;
   }
 
@@ -115,11 +193,7 @@ window.addEventListener('submit', async event => {
   });
 
   if (!data.citation || !data.thesis) {
-    const message = document.querySelector('#form-message');
-    if (message) {
-      message.className = 'message error';
-      message.textContent = 'Completa el radicado y la tesis jurisprudencial.';
-    }
+    showMessage('Completa el radicado y la tesis jurisprudencial.', 'error');
     return;
   }
 
@@ -129,38 +203,15 @@ window.addEventListener('submit', async event => {
   try {
     const id = crypto.randomUUID();
     await setDoc(doc(db, 'provenance', id), {
-      citation: data.citation,
-      corporation: data.corporation,
-      chamber: data.chamber,
-      caseType: data.caseType,
-      decisionDate: data.decisionDate,
-      magistrate: data.magistrate,
-      topic: data.topic,
-      subtopics: data.subtopics,
-      keywords: data.keywords,
-      legalIssue: data.legalIssue,
-      thesis: data.thesis,
-      rules: data.rules,
-      reasoning: data.reasoning,
-      decision: data.decision,
-      otherDecision: data.otherDecision,
+      ...cleanRecord(data),
       ownerUid: user.uid,
       ownerEmail: user.email,
       createdAt: serverTimestamp()
     });
-
-    const message = document.querySelector('#form-message');
-    if (message) {
-      message.className = 'message success';
-      message.textContent = 'Ficha guardada en Firestore.';
-    }
+    showMessage('Ficha guardada en Firestore. Los PDF no se guardan.', 'success');
     form.reset();
   } catch (error) {
-    const message = document.querySelector('#form-message');
-    if (message) {
-      message.className = 'message error';
-      message.textContent = `No se pudo guardar la ficha: ${error.message}`;
-    }
+    showMessage(`No se pudo guardar la ficha: ${error.message}`, 'error');
   } finally {
     if (button) button.disabled = false;
   }
