@@ -16,92 +16,46 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 const OWNER_EMAIL = 'estebanhn9820@gmail.com';
-const DB_NAME = 'iurisprudentia';
-const STORE = 'sentences';
-const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate', 'magistrate', 'topic', 'subtopics', 'keywords', 'legalIssue', 'thesis', 'rules', 'reasoning', 'decision', 'otherDecision'];
 
-function createAuthControls() {
-  const nav = document.querySelector('.navlinks');
-  if (!nav) return;
-
-  // Elimina controles antiguos o duplicados creados por cargas anteriores.
-  const existing = document.querySelectorAll('#firebase-owner-controls');
-  existing.forEach((element, index) => {
+function removeAllLoginButtons() {
+  document.querySelectorAll('button, a, [role="button"]').forEach(element => {
+    if (element.textContent.trim().toLowerCase().includes('iniciar sesión')) element.remove();
+  });
+  document.querySelectorAll('#firebase-owner-controls').forEach((element, index) => {
     if (index > 0) element.remove();
   });
+}
 
+function ensureAuthControls() {
+  const nav = document.querySelector('.navlinks');
+  if (!nav) return null;
   let controls = document.querySelector('#firebase-owner-controls');
   if (!controls) {
     controls = document.createElement('span');
     controls.id = 'firebase-owner-controls';
   }
-  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px';
   if (controls.parentElement !== nav) nav.append(controls);
-}
-
-function openLocalDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function putLocalRecord(record) {
-  const database = await openLocalDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE, 'readwrite');
-    transaction.objectStore(STORE).put(record);
-    transaction.oncomplete = () => { database.close(); resolve(); };
-    transaction.onerror = () => { database.close(); reject(transaction.error); };
-  });
-}
-
-function cleanRecord(record) {
-  const clean = {};
-  for (const field of FIELDS) clean[field] = String(record[field] ?? '');
-  return clean;
-}
-
-function showMessage(text, kind = 'success') {
-  const message = document.querySelector('#form-message');
-  if (message) {
-    message.className = `message ${kind}`;
-    message.textContent = text;
-  }
-}
-
-async function loadCloudRecords() {
-  const snapshot = await getDocs(collection(db, 'provenance'));
-  const cloudRecords = snapshot.docs.map(item => {
-    const data = item.data();
-    const createdAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
-    return { ...data, id: item.id, createdAt, file: null, fileName: '' };
-  });
-  for (const record of cloudRecords) await putLocalRecord(record);
+  controls.style.cssText = 'display:inline-flex;gap:8px;align-items:center;margin-left:12px';
+  return controls;
 }
 
 async function login() {
-  try { await signInWithPopup(auth, provider); }
-  catch (error) { alert(`No se pudo iniciar sesión: ${error.message}`); }
-}
-
-createAuthControls();
-
-const pdfInput = document.querySelector('#file');
-if (pdfInput) {
-  pdfInput.required = false;
-  const label = document.querySelector('label[for="file"]');
-  if (label) label.textContent = 'PDF de la providencia (opcional; no se guarda en la nube)';
+  try {
+    await signInWithPopup(auth, provider);
+  } catch (error) {
+    alert(`No se pudo iniciar sesión: ${error.message}`);
+  }
 }
 
 onAuthStateChanged(auth, async user => {
-  createAuthControls();
-  const controls = document.querySelector('#firebase-owner-controls');
+  removeAllLoginButtons();
+  const controls = ensureAuthControls();
   if (!controls) return;
   controls.replaceChildren();
 
-  if (user && user.email?.toLowerCase() === OWNER_EMAIL) {
+  const authorized = Boolean(user && user.email?.toLowerCase() === OWNER_EMAIL);
+
+  if (authorized) {
     const status = document.createElement('span');
     status.className = 'hint';
     status.style.cssText = 'white-space:nowrap';
@@ -116,25 +70,15 @@ onAuthStateChanged(auth, async user => {
     logout.title = 'Cerrar sesión';
     logout.addEventListener('click', async () => {
       logout.disabled = true;
-      try {
-        await signOut(auth);
-        showMessage('Sesión cerrada correctamente.', 'success');
-      } catch (error) {
-        showMessage(`No se pudo cerrar la sesión: ${error.message}`, 'error');
-        logout.disabled = false;
-      }
+      await signOut(auth);
     });
-    controls.append(status, logout);
 
-    try {
-      await loadCloudRecords();
-      showMessage('Conectado: las fichas se sincronizan con Firestore. Los PDF no se guardan.', 'success');
-    } catch (error) {
-      showMessage(`No se pudieron cargar las fichas de la nube: ${error.message}`, 'error');
-    }
+    controls.append(status, logout);
   } else {
     if (user) await signOut(auth);
+
     const loginButton = document.createElement('button');
+    loginButton.id = 'firebase-login-button';
     loginButton.type = 'button';
     loginButton.className = 'btn';
     loginButton.textContent = 'Iniciar sesión con Google';
@@ -142,7 +86,6 @@ onAuthStateChanged(auth, async user => {
     controls.append(loginButton);
   }
 
-  const authorized = Boolean(user && user.email?.toLowerCase() === OWNER_EMAIL);
   document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
     if (element.id !== 'file') element.disabled = !authorized;
   });
@@ -152,22 +95,31 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
-  event.preventEventDefault?.();
   event.preventDefault();
   event.stopImmediatePropagation();
 
   const user = auth.currentUser;
   if (!user || user.email?.toLowerCase() !== OWNER_EMAIL) {
-    showMessage('Inicia sesión con la cuenta autorizada para guardar una ficha.', 'error');
+    const message = document.querySelector('#form-message');
+    if (message) {
+      message.className = 'message error';
+      message.textContent = 'Inicia sesión con la cuenta autorizada para guardar una ficha.';
+    }
     return;
   }
 
   const form = event.target;
   const data = {};
-  form.querySelectorAll('[data-key]').forEach(element => { data[element.dataset.key] = element.value.trim(); });
+  form.querySelectorAll('[data-key]').forEach(element => {
+    data[element.dataset.key] = element.value.trim();
+  });
 
   if (!data.citation || !data.thesis) {
-    showMessage('Completa el radicado y la tesis jurisprudencial.', 'error');
+    const message = document.querySelector('#form-message');
+    if (message) {
+      message.className = 'message error';
+      message.textContent = 'Completa el radicado y la tesis jurisprudencial.';
+    }
     return;
   }
 
@@ -177,15 +129,38 @@ window.addEventListener('submit', async event => {
   try {
     const id = crypto.randomUUID();
     await setDoc(doc(db, 'provenance', id), {
-      ...cleanRecord(data),
+      citation: data.citation,
+      corporation: data.corporation,
+      chamber: data.chamber,
+      caseType: data.caseType,
+      decisionDate: data.decisionDate,
+      magistrate: data.magistrate,
+      topic: data.topic,
+      subtopics: data.subtopics,
+      keywords: data.keywords,
+      legalIssue: data.legalIssue,
+      thesis: data.thesis,
+      rules: data.rules,
+      reasoning: data.reasoning,
+      decision: data.decision,
+      otherDecision: data.otherDecision,
       ownerUid: user.uid,
       ownerEmail: user.email,
       createdAt: serverTimestamp()
     });
-    showMessage('Ficha guardada en Firestore. No se subió ningún PDF.', 'success');
+
+    const message = document.querySelector('#form-message');
+    if (message) {
+      message.className = 'message success';
+      message.textContent = 'Ficha guardada en Firestore.';
+    }
     form.reset();
   } catch (error) {
-    showMessage(`No se pudo guardar la ficha: ${error.message}`, 'error');
+    const message = document.querySelector('#form-message');
+    if (message) {
+      message.className = 'message error';
+      message.textContent = `No se pudo guardar la ficha: ${error.message}`;
+    }
   } finally {
     if (button) button.disabled = false;
   }
