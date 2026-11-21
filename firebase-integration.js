@@ -17,6 +17,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
+const OWNER_EMAIL = 'estebanhn9820@gmail.com';
 const DB_NAME = 'iurisprudentia';
 const STORE = 'sentences';
 const FIELDS = ['citation', 'corporation', 'chamber', 'caseType', 'decisionDate', 'magistrate', 'topic', 'subtopics', 'keywords', 'legalIssue', 'thesis', 'rules', 'reasoning', 'decision', 'otherDecision'];
@@ -25,81 +26,6 @@ let syncing = false;
 function showMessage(text, kind = 'success') {
   const message = document.querySelector('#form-message');
   if (message) { message.className = `message ${kind}`; message.textContent = text; }
-}
-
-function installLandingPage() {
-  document.body.classList.add('auth-pending');
-
-  const styles = document.createElement('style');
-  styles.id = 'landing-page-styles';
-  styles.textContent = `
-    body.auth-pending main, body.auth-pending footer,
-    body.auth-public main, body.auth-public footer { display: none !important; }
-    body.auth-public .navlinks > a { display: none !important; }
-    #public-landing { display: none; }
-    body.auth-public #public-landing { display: block; }
-    #public-landing { color: #f7f4ee; background: #17283c; overflow: hidden; }
-    .landing-hero { position: relative; padding: clamp(64px, 10vw, 128px) 24px 86px; background: radial-gradient(ellipse at 82% 18%, #526a76 0, transparent 34%), linear-gradient(130deg, #17283c, #263d51 60%, #344b55); }
-    .landing-inner { width: min(1120px, 100%); margin: auto; }
-    .landing-kicker { color: #d3b875; font-size: 12px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
-    .landing-hero h1 { margin: 18px 0 14px; color: #fff; font: 600 clamp(42px, 7vw, 76px)/1.04 Georgia, serif; letter-spacing: .015em; }
-    .landing-lead { max-width: 820px; margin: 0; color: #f0eadc; font: 500 clamp(20px, 3vw, 29px)/1.4 Georgia, serif; }
-    .landing-copy { max-width: 720px; margin: 22px 0 30px; color: #d2dbe0; font-size: 17px; line-height: 1.8; }
-    .landing-cta { display: inline-flex; align-items: center; gap: 10px; padding: 13px 20px; border: 1px solid #d5bd80; border-radius: 8px; background: #a48648; color: white; font: 650 15px inherit; text-decoration: none; cursor: pointer; }
-    .landing-cta:hover { background: #92733b; }
-    .landing-note { margin: 13px 0 0; color: #c2ccd1; font-size: 12px; }
-    .landing-benefits { padding: 76px 24px 84px; background: #f7f5ef; color: #202a38; }
-    .landing-benefits h2, .landing-audience h2 { margin: 0 0 12px; font: 600 clamp(29px, 4vw, 40px)/1.2 Georgia, serif; }
-    .landing-section-copy { max-width: 720px; margin: 0 0 32px; color: #637080; line-height: 1.7; }
-    .landing-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 15px; }
-    .landing-card { min-height: 190px; padding: 22px 19px; border: 1px solid #e4dfd4; border-radius: 12px; background: #fff; box-shadow: 0 8px 26px #202a380b; }
-    .landing-icon { display: block; margin-bottom: 20px; font-size: 27px; }
-    .landing-card h3 { margin: 0 0 8px; color: #26384d; font: 650 17px/1.35 Georgia, serif; }
-    .landing-card p { margin: 0; color: #6b7280; font-size: 13px; line-height: 1.6; }
-    .landing-audience { padding: 68px 24px 76px; background: #ede9df; color: #202a38; }
-    .landing-audience p { max-width: 900px; margin: 0; color: #596575; font-size: 16px; line-height: 1.8; }
-    .landing-footer { padding: 22px 24px; background: #17283c; color: #c4cbd0; text-align: center; font-size: 12px; }
-    @media (max-width: 900px) { .landing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 520px) { .landing-grid { grid-template-columns: 1fr; } .landing-hero { padding-inline: 20px; } .landing-benefits, .landing-audience { padding-inline: 20px; } }
-  `;
-  document.head.append(styles);
-
-  const landing = document.createElement('div');
-  landing.id = 'public-landing';
-  landing.innerHTML = `
-    <section class="landing-hero">
-      <div class="landing-inner">
-        <span class="landing-kicker">Biblioteca personal · Jurisprudencia penal colombiana</span>
-        <h1>IURISPRUDENTIA</h1>
-        <p class="landing-lead">La biblioteca jurisprudencial inteligente para estudiar, organizar y consultar la jurisprudencia penal colombiana.</p>
-        <p class="landing-copy">Construya su propio repositorio de decisiones judiciales, clasifique providencias por tema, identifique reglas jurisprudenciales y consulte su biblioteca desde cualquier lugar.</p>
-        <button class="landing-cta" id="landing-login-button" type="button">Iniciar sesión con Google <span aria-hidden="true">→</span></button>
-        <p class="landing-note">Su biblioteca personal, disponible en sus dispositivos al iniciar sesión.</p>
-      </div>
-    </section>
-    <section class="landing-benefits">
-      <div class="landing-inner">
-        <h2>Jurisprudencia organizada para el trabajo jurídico</h2>
-        <p class="landing-section-copy">Una herramienta de consulta personal para convertir providencias en conocimiento estructurado y fácil de recuperar.</p>
-        <div class="landing-grid">
-          <article class="landing-card"><span class="landing-icon" aria-hidden="true">📚</span><h3>Organice sentencias y autos</h3><p>Reúna providencias y fichas en una biblioteca personal, ordenada y accesible.</p></article>
-          <article class="landing-card"><span class="landing-icon" aria-hidden="true">⚖️</span><h3>Identifique reglas jurisprudenciales</h3><p>Registre tesis, reglas, problemas jurídicos y fundamentos relevantes.</p></article>
-          <article class="landing-card"><span class="landing-icon" aria-hidden="true">🔎</span><h3>Encuentre precedentes en segundos</h3><p>Busque por radicado, tema, palabras clave, magistratura o corporación.</p></article>
-          <article class="landing-card"><span class="landing-icon" aria-hidden="true">🤖</span><h3>Consulte su biblioteca mediante IA</h3><p>Prepare su repositorio para explorar y consultar el conocimiento jurisprudencial.</p></article>
-          <article class="landing-card"><span class="landing-icon" aria-hidden="true">☁️</span><h3>Acceda desde cualquier equipo</h3><p>Inicie sesión con Google para sincronizar fichas y documentos en la nube.</p></article>
-        </div>
-      </div>
-    </section>
-    <section class="landing-audience">
-      <div class="landing-inner">
-        <h2>Para quienes trabajan con jurisprudencia</h2>
-        <p>IURISPRUDENTIA está pensada para jueces y empleados judiciales que estudian precedentes, litigantes que preparan sus argumentos e investigadores que analizan líneas jurisprudenciales. Una biblioteca clara y personal ayuda a dedicar menos tiempo a buscar y más tiempo a comprender el derecho.</p>
-      </div>
-    </section>
-    <div class="landing-footer">IURISPRUDENTIA · Biblioteca jurisprudencial personal</div>
-  `;
-  document.querySelector('header')?.after(landing);
-  document.querySelector('#landing-login-button')?.addEventListener('click', login);
 }
 
 function ensureAuthControls() {
@@ -114,15 +40,7 @@ function ensureAuthControls() {
   return controls;
 }
 
-function removeDuplicateLoginButtons() {
-  const controls = document.getElementById('firebase-owner-controls');
-  document.querySelectorAll('.navlinks button, .navlinks a, .navlinks [role="button"]').forEach(element => {
-    if (controls?.contains(element)) return;
-    if (/^iniciar\s+sesi[oó]n\s+con\s+google$/i.test(element.textContent.trim())) element.remove();
-  });
-}
-
-function openLocalDatabase() {
+function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = () => {
@@ -133,20 +51,19 @@ function openLocalDatabase() {
   });
 }
 
-async function localRecords() {
-  const database = await openLocalDatabase();
+async function getLocalRecords() {
+  const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE, 'readonly');
     const request = transaction.objectStore(STORE).getAll();
     request.onsuccess = () => resolve(request.result || []);
     request.onerror = () => reject(request.error);
     transaction.oncomplete = () => database.close();
-    transaction.onerror = () => { database.close(); reject(transaction.error); };
   });
 }
 
-async function writeLocal(record) {
-  const database = await openLocalDatabase();
+async function putLocal(record) {
+  const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE, 'readwrite');
     transaction.objectStore(STORE).put(record);
@@ -155,8 +72,8 @@ async function writeLocal(record) {
   });
 }
 
-async function removeLocal(id) {
-  const database = await openLocalDatabase();
+async function deleteLocal(id) {
+  const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE, 'readwrite');
     transaction.objectStore(STORE).delete(id);
@@ -178,7 +95,7 @@ async function uploadPdf(file, user, id) {
   return path;
 }
 
-async function saveCloudRecord(record, user) {
+async function saveCloud(record, user) {
   const id = record.id || crypto.randomUUID();
   let filePath = record.filePath || '';
   if (record.file instanceof Blob) filePath = await uploadPdf(record.file, user, id);
@@ -195,39 +112,30 @@ async function saveCloudRecord(record, user) {
   return { ...data, id, createdAt: new Date().toISOString(), file: record.file || null };
 }
 
+// No automatic reload: synchronize once and refresh the existing library in place.
 async function syncLibrary(user) {
   if (syncing) return;
   syncing = true;
   try {
     const ownedQuery = query(collection(db, 'provenance'), where('ownerUid', '==', user.uid));
-    const initialSnapshot = await getDocs(ownedQuery);
-    const cloudIds = new Set(initialSnapshot.docs.map(item => item.id));
-    const existingLocal = await localRecords();
-
-    for (const local of existingLocal) {
-      if (!cloudIds.has(local.id)) await saveCloudRecord(local, user);
-    }
-
     const snapshot = await getDocs(ownedQuery);
-    const localById = new Map((await localRecords()).map(record => [record.id, record]));
-    const cloudById = new Set(snapshot.docs.map(item => item.id));
-    let changed = false;
+    const local = await getLocalRecords();
+    const localById = new Map(local.map(record => [record.id, record]));
 
     for (const item of snapshot.docs) {
       const data = item.data();
-      const local = localById.get(item.id);
-      let file = local?.file || null;
-      if (data.filePath && (!file || local.filePath !== data.filePath)) file = await getBlob(ref(storage, data.filePath));
+      const old = localById.get(item.id);
+      let file = old?.file || null;
+      if (data.filePath && (!file || old?.filePath !== data.filePath)) {
+        try { file = await getBlob(ref(storage, data.filePath)); }
+        catch (error) { console.warn('PDF no disponible:', error); }
+      }
       const createdAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
-      await writeLocal({ ...data, id: item.id, createdAt, file, fileName: data.fileName || '' });
-      changed = true;
+      await putLocal({ ...data, id: item.id, createdAt, file, fileName: data.fileName || '' });
     }
 
-    for (const local of localById.values()) {
-      if (!cloudById.has(local.id)) { await removeLocal(local.id); changed = true; }
-    }
-    if (changed) window.location.reload();
-    else showMessage('Biblioteca sincronizada con tu cuenta de Google.', 'success');
+    if (typeof window.loadRecords === 'function') await window.loadRecords();
+    showMessage('Biblioteca sincronizada con tu cuenta de Google.', 'success');
   } catch (error) {
     showMessage(`No se pudo sincronizar la biblioteca: ${error.message}`, 'error');
   } finally {
@@ -241,9 +149,14 @@ async function login() {
 }
 
 function renderAuth(user) {
-  removeDuplicateLoginButtons();
-  const controls = ensureAuthControls();
-  if (!controls) return;
+  const nav = document.querySelector('.navlinks');
+  if (!nav) return;
+  const existing = [...document.querySelectorAll('#firebase-owner-controls')];
+  let controls = existing.shift();
+  existing.forEach(element => element.remove());
+  if (!controls) { controls = document.createElement('span'); controls.id = 'firebase-owner-controls'; }
+  if (controls.parentElement !== nav) nav.append(controls);
+  controls.style.cssText = 'display:inline-flex;align-items:center;gap:8px;margin-left:12px;white-space:nowrap';
   controls.replaceChildren();
 
   document.body.classList.remove('auth-pending', 'auth-public');
@@ -257,72 +170,59 @@ function renderAuth(user) {
     logout.type = 'button';
     logout.className = 'btn secondary';
     logout.textContent = 'Cerrar sesión';
-    logout.addEventListener('click', async () => {
-      logout.disabled = true;
-      try { await signOut(auth); window.location.assign('./'); }
-      catch (error) { showMessage(`No se pudo cerrar la sesión: ${error.message}`, 'error'); logout.disabled = false; }
-    });
+    logout.addEventListener('click', async () => { await signOut(auth); window.location.assign('./'); });
     controls.append(identity, logout);
 
+    const authorized = user.email?.toLowerCase() === OWNER_EMAIL;
     document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
-      if (element.id !== 'file') element.disabled = false;
+      if (element.id !== 'file') element.disabled = !authorized;
     });
     const saveButton = document.querySelector('#save-button');
-    if (saveButton) saveButton.disabled = false;
-    syncLibrary(user);
+    if (saveButton) saveButton.disabled = !authorized;
+    if (authorized) syncLibrary(user);
   } else {
     document.body.classList.add('auth-public');
     const loginButton = document.createElement('button');
-    loginButton.id = 'firebase-login-button';
     loginButton.type = 'button';
     loginButton.className = 'btn';
     loginButton.textContent = 'Iniciar sesión con Google';
     loginButton.addEventListener('click', login);
     controls.append(loginButton);
-
-    document.querySelectorAll('#record-form input, #record-form textarea, #record-form select').forEach(element => {
-      if (element.id !== 'file') element.disabled = true;
-    });
-    const saveButton = document.querySelector('#save-button');
-    if (saveButton) saveButton.disabled = true;
   }
 }
 
-installLandingPage();
+onAuthStateChanged(auth, renderAuth);
 
 const pdfInput = document.querySelector('#file');
 if (pdfInput) {
   pdfInput.required = false;
   const label = document.querySelector('label[for="file"]');
-  if (label) label.textContent = 'PDF de la providencia (opcional; se guarda de forma privada en la nube)';
+  if (label) label.textContent = 'PDF de la providencia (opcional; se guarda en la nube)';
 }
-
-ensureAuthControls();
-removeDuplicateLoginButtons();
-new MutationObserver(() => { removeDuplicateLoginButtons(); ensureAuthControls(); }).observe(document.documentElement, { childList: true, subtree: true });
-onAuthStateChanged(auth, renderAuth);
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
   event.preventDefault();
   event.stopImmediatePropagation();
   const user = auth.currentUser;
-  if (!user) { showMessage('Inicia sesión con Google para guardar una ficha.', 'error'); return; }
-
+  if (!user || user.email?.toLowerCase() !== OWNER_EMAIL) {
+    showMessage('Inicia sesión con la cuenta autorizada para guardar una ficha.', 'error');
+    return;
+  }
   const form = event.target;
   const data = {};
   form.querySelectorAll('[data-key]').forEach(element => { data[element.dataset.key] = element.value.trim(); });
   if (!data.citation || !data.thesis) { showMessage('Completa el radicado y la tesis jurisprudencial.', 'error'); return; }
-
   const file = document.querySelector('#file')?.files?.[0] || null;
   const button = document.querySelector('#save-button');
   if (button) button.disabled = true;
   try {
-    showMessage(file ? 'Subiendo ficha y PDF a la nube…' : 'Guardando ficha en la nube…', 'success');
-    await saveCloudRecord({ ...data, id: crypto.randomUUID(), file, fileName: file?.name || '' }, user);
+    showMessage(file ? 'Subiendo ficha y PDF…' : 'Guardando ficha…', 'success');
+    const saved = await saveCloud({ ...data, id: crypto.randomUUID(), file, fileName: file?.name || '' }, user);
+    await putLocal(saved);
     showMessage('Ficha y documento guardados en la nube.', 'success');
     form.reset();
-    window.location.reload();
+    if (typeof window.loadRecords === 'function') await window.loadRecords();
   } catch (error) {
     showMessage(`No se pudo guardar en la nube: ${error.message}`, 'error');
   } finally {
@@ -335,16 +235,16 @@ window.addEventListener('submit', async event => {
   event.preventDefault();
   event.stopImmediatePropagation();
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user || user.email?.toLowerCase() !== OWNER_EMAIL) return;
   const id = document.querySelector('#edit-id')?.value;
-  const local = (await localRecords()).find(record => record.id === id);
-  if (!local) return;
-  const data = { ...local };
+  const old = (await getLocalRecords()).find(record => record.id === id);
+  if (!old) return;
+  const data = { ...old };
   event.target.querySelectorAll('[data-key]').forEach(element => { data[element.dataset.key] = element.value.trim(); });
   try {
-    await saveCloudRecord(data, user);
-    showMessage('Cambios guardados en la nube.', 'success');
-    window.location.reload();
+    const saved = await saveCloud(data, user);
+    await putLocal(saved);
+    if (typeof window.loadRecords === 'function') await window.loadRecords();
   } catch (error) {
     const message = document.querySelector('#edit-message');
     if (message) { message.className = 'message error'; message.textContent = error.message; }
@@ -355,21 +255,17 @@ window.addEventListener('click', async event => {
   const button = event.target.closest('button[data-action="delete"]');
   if (!button) return;
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user || user.email?.toLowerCase() !== OWNER_EMAIL) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  const recordId = button.dataset.id;
-  const record = (await localRecords()).find(item => item.id === recordId);
-  if (!record || !confirm(`¿Eliminar la ficha “${record.citation || ''}” y su PDF de todos tus dispositivos?`)) return;
+  const record = (await getLocalRecords()).find(item => item.id === button.dataset.id);
+  if (!record || !confirm(`¿Eliminar la ficha “${record.citation || ''}” y su PDF?`)) return;
   try {
-    await deleteDoc(doc(db, 'provenance', recordId));
+    await deleteDoc(doc(db, 'provenance', record.id));
     if (record.filePath) {
-      try { await deleteObject(ref(storage, record.filePath)); }
-      catch (error) { console.warn('No se pudo eliminar el PDF de Storage:', error); }
+      try { await deleteObject(ref(storage, record.filePath)); } catch (error) { console.warn(error); }
     }
-    await removeLocal(recordId);
-    window.location.reload();
-  } catch (error) {
-    showMessage(`No se pudo eliminar la ficha: ${error.message}`, 'error');
-  }
+    await deleteLocal(record.id);
+    if (typeof window.loadRecords === 'function') await window.loadRecords();
+  } catch (error) { showMessage(`No se pudo eliminar la ficha: ${error.message}`, 'error'); }
 }, true);
