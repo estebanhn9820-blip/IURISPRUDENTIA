@@ -96,10 +96,22 @@ onAuthStateChanged(auth, async user => {
     status.textContent = user.email;
 
     const logout = document.createElement('button');
+    logout.id = 'firebase-logout-button';
     logout.type = 'button';
     logout.className = 'btn secondary';
     logout.textContent = 'Cerrar sesión';
-    logout.addEventListener('click', () => signOut(auth));
+    logout.setAttribute('aria-label', 'Cerrar sesión de Google');
+    logout.title = 'Cerrar sesión';
+    logout.addEventListener('click', async () => {
+      logout.disabled = true;
+      try {
+        await signOut(auth);
+        showMessage('Sesión cerrada correctamente.', 'success');
+      } catch (error) {
+        showMessage(`No se pudo cerrar la sesión: ${error.message}`, 'error');
+        logout.disabled = false;
+      }
+    });
     controls.append(status, logout);
 
     try {
