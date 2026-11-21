@@ -50,5 +50,6 @@ $('#edit-form').addEventListener('submit',async event=>{event.preventDefault();c
 function closePdf(){if($('#pdf-dialog').open)$('#pdf-dialog').close();$('#pdf-frame').removeAttribute('src');if(objectUrl){URL.revokeObjectURL(objectUrl);objectUrl=null}}$('#close-pdf').addEventListener('click',closePdf);$('#pdf-dialog').addEventListener('click',event=>{if(event.target===$('#pdf-dialog'))closePdf()});$('#close-edit').addEventListener('click',()=>$('#edit-dialog').close());$('#edit-dialog').addEventListener('click',event=>{if(event.target===$('#edit-dialog'))$('#edit-dialog').close()});buildEditFields();loadRecords();
 </script>
 <script type="module" src="./firebase-integration.js"></script>
+<script type="module" src="./firebase-integration.js"></script>
 </body>
 </html>
