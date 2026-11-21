@@ -2,12 +2,6 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
 import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyAQl4ldky4k5GCeRvoaztpjLISw-mb-xJE",
   authDomain: "iurisprudentia-40ac5.firebaseapp.com",
@@ -16,9 +10,6 @@ const firebaseConfig = {
   messagingSenderId: "358518113591",
   appId: "1:358518113591:web:9b1497a724fe5e55dd86b2"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -86,10 +77,7 @@ async function loadCloudRecords() {
     const createdAt = data.createdAt?.toDate?.()?.toISOString?.() || data.createdAt || new Date().toISOString();
     return { ...data, id: item.id, createdAt, file: null, fileName: '' };
   });
-
-  // Keep the existing interface working by mirroring cloud fichas to its local IndexedDB cache.
   for (const record of cloudRecords) await putLocalRecord(record);
-  if (typeof window.loadRecords === 'function') await window.loadRecords();
 }
 
 async function login() {
@@ -99,7 +87,6 @@ async function login() {
 
 createAuthControls();
 
-// Storage is not used: PDFs are optional and are not uploaded or synchronized.
 const pdfInput = document.querySelector('#file');
 if (pdfInput) {
   pdfInput.required = false;
@@ -148,7 +135,7 @@ onAuthStateChanged(auth, async user => {
 
 window.addEventListener('submit', async event => {
   if (event.target?.id !== 'record-form') return;
-  event.preventDefault();
+  event.preventEvent?.();
   event.stopImmediatePropagation();
 
   const user = auth.currentUser;
@@ -169,17 +156,12 @@ window.addEventListener('submit', async event => {
   if (button) button.disabled = true;
   try {
     const id = crypto.randomUUID();
-    const record = {
+    await setDoc(doc(db, 'provenance', id), {
       ...cleanRecord(data),
       ownerUid: user.uid,
       ownerEmail: user.email,
-      createdAt: new Date().toISOString(),
-      file: null,
-      fileName: ''
-    };
-    await setDoc(doc(db, 'provenance', id), { ...cleanRecord(data), ownerUid: user.uid, ownerEmail: user.email, createdAt: serverTimestamp() });
-    await putLocalRecord({ ...record, createdAt: new Date().toISOString() });
-    if (typeof window.loadRecords === 'function') await window.loadRecords();
+      createdAt: serverTimestamp()
+    });
     showMessage('Ficha guardada en Firestore. No se subió ningún PDF.', 'success');
     form.reset();
   } catch (error) {
