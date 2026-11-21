@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import { getFirestore, collection, doc, getDocs, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyAQl4ldky4k5GeRvqeztpjL5wr-mb-xJE',
+  apiKey: 'AIzaSyAQl4ldky4k5GCeRvoaztpjLISw-mb-xJE',
   authDomain: 'iurisprudentia-40ac5.firebaseapp.com',
   projectId: 'iurisprudentia-40ac5',
   storageBucket: 'iurisprudentia-40ac5.firebasestorage.app',
